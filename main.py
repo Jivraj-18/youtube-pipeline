@@ -38,12 +38,12 @@ def get_authenticated_service():
     if os.path.exists("token.pickle"):
         with open("token.pickle", "rb") as token:
             creds = pickle.load(token)
-    if not creds or not creds.valid:
-        flow = InstalledAppFlow.from_client_secrets_file(
-            "client_secret.json", SCOPES)
-        creds = flow.run_local_server(port=8080)
-        with open("token.pickle", "wb") as token:
-            pickle.dump(creds, token)
+    # if not creds or not creds.valid:
+    #     flow = InstalledAppFlow.from_client_secrets_file(
+    #         "client_secret.json", SCOPES)
+    #     creds = flow.run_local_server(port=8080)
+    #     with open("token.pickle", "wb") as token:
+    #         pickle.dump(creds, token)
     return build("youtube", "v3", credentials=creds)
 
 def generate_chapters(transcript_path):
@@ -119,12 +119,30 @@ def upload_video(youtube, video_path, title, transcript_path, tags=None, privacy
         "snippet": {
             "title": title,
             "description": full_description,
-            "tags": tags or [],
             "categoryId": "27"  # 27 = Education
+            "defaultLanguage": "en",
         },
         "status": {
+            "embeddable": True,
+            "license": "youtube",
+            "makeForKids": False,
+            "selfDeclaredMadeForKids": False,
+            "PublishedAt": "2023-10-01T00:00:00Z",  # Example date
             "privacyStatus": privacy_status  # 'private', 'public', or 'unlisted'
-        }
+        },
+        "recordingDetails": {
+            "location": {
+                "altitude": 37.422,
+                "latitude": 37.422,
+                "longitude": -122.084
+            },
+            "locationDescription": "Googleplex, Mountain View, CA",
+            "recordingDate": "2023-10-01T00:00:00Z"  # Example date
+        },
+        "contentDetails": {
+            "caption":False,
+            "hasCustomThumbnail": True,
+        },
     }
     return "done"
     # media = MediaFileUpload(video_path, chunksize=-1, resumable=True, mimetype='video/*')
@@ -139,6 +157,33 @@ def upload_video(youtube, video_path, title, transcript_path, tags=None, privacy
     # print("Upload complete. Video ID:", response["id"])
     # return response["id"]
 
+
+def upload_thumbnail(youtube, video_id, thumbnail_path):
+    request = youtube.thumbnails().set(
+        videoId=video_id,
+        media_body=MediaFileUpload(thumbnail_path)
+    )
+    response = request.execute()
+    print("Thumbnail uploaded:", response)
+    return response
+
+def add_to_playlist(youtube, video_id, playlist_id):
+    # Add video to playlist
+    request = youtube.playlistItems().insert(
+        part="snippet",
+        body={
+            "snippet": {
+                "playlistId": playlist_id,
+                "resourceId": {
+                    "videoId": video_id
+                }
+            }
+        }
+    )
+    response = request.execute()
+    print("Video added to playlist:", response)
+
+
 # ----------- Usage Example -----------
 if __name__ == "__main__":
     youtube = get_authenticated_service()
@@ -149,4 +194,14 @@ if __name__ == "__main__":
         transcript_path="sample_transcription.txt",
         tags=["automation", "python", "youtube api"],
         privacy_status="unlisted"
+    )
+    upload_thumbnail(
+        youtube=youtube,
+        video_id=video_id,
+        thumbnail_path="thumbnail.jpg"
+    )
+    add_to_playlist(
+        youtube=youtube,
+        video_id=video_id,
+        playlist_id="PL1234567890"  # Replace with your playlist ID
     )
